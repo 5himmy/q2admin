@@ -71,7 +71,7 @@ typedef struct {
     int total;              // The msec sum from frames over a period of time
     int previous;           // The value in the previous usercmd_t
     int violations;         // How many times player exceeded global msec limits
-    float end_frame;        // lframenum marking the end of the timespan
+    time_t end_time;        // wall clock time marking the end of the timespan
 } player_msec_t;
 
 extern char zbot_teststring1[];

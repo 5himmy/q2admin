@@ -141,42 +141,53 @@ void ClientThink(edict_t *ent, usercmd_t *ucmd) {
         }
     }
 
-    if (lframenum > cl->msec.end_frame) {
-        if (cl->show_fps) {
-            if (cl->msec.total == 500) {
-                gi.cprintf(ent, PRINT_HIGH, "%3.2f fps\n", (float) cl->frames_count * 2);
+    time_t now = time(NULL);
+    if (now >= cl->msec.end_time) {
+        // skip the first measurement window after connect (total is meaningless)
+        if (cl->msec.end_time > 0) {
+            if (cl->show_fps) {
+                if (cl->msec.total == 500) {
+                    gi.cprintf(ent, PRINT_HIGH, "%3.2f fps\n", (float) cl->frames_count * 2);
+                }
             }
-        }
 
-        if (cl->msec.total > msec.max_allowed) {
-            if (msec.max_violations) {
+            if (cl->msec.total > msec.max_allowed) {
+                if (msec.max_violations) {
+                    cl->msec.violations++;
+                    if (cl->msec.violations >= msec.max_violations) {
+                        if (msec.action != MVA_NOTHING) {
+                            gi.bprintf(PRINT_HIGH, "Excessive msec consumption from %s\n", cl->name);
+                            Q_snprintf(buffer, sizeof(buffer), "exceeded msec limit %d/%d in %d secs", cl->msec.total, msec.max_allowed, msec.timespan);
+                            addCmdQueue(client, QCMD_DISCONNECT, 1, 0, buffer);
+                        }
+                    }
+                } else {
+                    // let things stabilize after joining for a few seconds
+                    if (cl->enteredgame + 5 < ltime) {
+                        cl->speedfreeze = ltime + 3;
+                    }
+                }
+            }
+            if (cl->msec.total < msec.min_required) {
                 cl->msec.violations++;
                 if (cl->msec.violations >= msec.max_violations) {
                     if (msec.action != MVA_NOTHING) {
-                        gi.bprintf(PRINT_HIGH, "Excessive msec consumption from %s\n", cl->name);
-                        Q_snprintf(buffer, sizeof(buffer), "exceeded msec limit %d/%d in %d secs", cl->msec.total, msec.max_allowed, msec.timespan);
+                        gi.bprintf(PRINT_HIGH, "msec underflow from %s\n", cl->name);
+                        Q_snprintf(buffer, sizeof(buffer), "something is fishy, didn't meet msec requirement - %d/%d in %d secs", cl->msec.total, msec.min_required, msec.timespan);
                         addCmdQueue(client, QCMD_DISCONNECT, 1, 0, buffer);
                     }
                 }
-            } else {
-                // let things stabilize after joining for a few seconds
-                if (cl->enteredgame + 5 < ltime) {
-                    cl->speedfreeze = ltime + 3;
-                }
             }
-        }
-        if (cl->msec.total < msec.min_required) {
-            cl->msec.violations++;
-            if (cl->msec.violations >= msec.max_violations) {
-                if (msec.action != MVA_NOTHING) {
-                    gi.bprintf(PRINT_HIGH, "msec underflow from %s\n", cl->name);
-                    Q_snprintf(buffer, sizeof(buffer), "something is fishy, didn't meet msec requirement - %d/%d in %d secs", cl->msec.total, msec.min_required, msec.timespan);
-                    addCmdQueue(client, QCMD_DISCONNECT, 1, 0, buffer);
+
+            // decay violations on a clean window
+            if (cl->msec.total >= msec.min_required && cl->msec.total <= msec.max_allowed) {
+                if (cl->msec.violations > 0) {
+                    cl->msec.violations--;
                 }
             }
         }
 
-        cl->msec.end_frame = lframenum + (msec.timespan * HZ);
+        cl->msec.end_time = now + msec.timespan;
         cl->msec.previous = cl->msec.total;
         cl->msec.total = 0;
         cl->frames_count = 0;
