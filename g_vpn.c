@@ -44,6 +44,7 @@ void vpn_cache_store(netadr_t *addr, vpn_state_t result, const char *network, co
     vpn_cache_entry_t *entry;
     int oldest = 0;
     float oldest_time = 0;
+    int expired_slot = -1;
 
     // check if already cached (update in-place)
     for (int j = 0; j < vpn_cache_count; j++) {
@@ -51,14 +52,20 @@ void vpn_cache_store(netadr_t *addr, vpn_state_t result, const char *network, co
             entry = &vpn_cache[j];
             goto update;
         }
+        // track first expired slot for reuse
+        if (expired_slot == -1 && vpn_cache[j].expiry <= ltime) {
+            expired_slot = j;
+        }
         if (vpn_cache[j].expiry < oldest_time || j == 0) {
             oldest_time = vpn_cache[j].expiry;
             oldest = j;
         }
     }
 
-    // new entry
-    if (vpn_cache_count < VPN_CACHE_SIZE) {
+    // prefer: expired slot > new slot > evict oldest
+    if (expired_slot != -1) {
+        entry = &vpn_cache[expired_slot];
+    } else if (vpn_cache_count < VPN_CACHE_SIZE) {
         entry = &vpn_cache[vpn_cache_count++];
     } else {
         entry = &vpn_cache[oldest];
@@ -169,7 +176,9 @@ void LookupVPNStatus(edict_t *ent)
     proxyinfo[i].dl.generation = proxyinfo[i].generation;
     Q_strncpy(pi->dl.path, request, sizeof(pi->dl.path)-1);
 
-    HTTP_QueueDownload(&proxyinfo[i].dl);
+    if (!HTTP_QueueDownload(&proxyinfo[i].dl)) {
+        proxyinfo[i].vpn.state = VPN_UNKNOWN;
+    }
 }
 
 /**

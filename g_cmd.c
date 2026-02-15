@@ -2930,6 +2930,11 @@ qboolean doClientCommand(edict_t *ent, int client, qboolean *checkforfloodafter)
             }
         }
 
+        if (vpn_enable && proxyinfo[client].vpn.state == VPN_CHECKING) {
+            gi.cprintf(ent, PRINT_HIGH, "Please wait, verifying connection...\n");
+            return qfalse;
+        }
+
         if (checkForMute(client, ent, qtrue)) {
             return qfalse;
         }

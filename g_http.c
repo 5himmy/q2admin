@@ -215,6 +215,8 @@ void HTTP_StartDownload(dlhandle_t *dl) {
     curl_easy_setopt(dl->curl, CURLOPT_FOLLOWLOCATION, 1);
     curl_easy_setopt(dl->curl, CURLOPT_MAXREDIRS, 5);
     curl_easy_setopt(dl->curl, CURLOPT_USERAGENT, "q2admin");
+    curl_easy_setopt(dl->curl, CURLOPT_CONNECTTIMEOUT, 10L);
+    curl_easy_setopt(dl->curl, CURLOPT_TIMEOUT, 15L);
     curl_easy_setopt(dl->curl, CURLOPT_REFERER, "");
     curl_easy_setopt(dl->curl, CURLOPT_CAPATH, http_cacert_path);
 
