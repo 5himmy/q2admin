@@ -35,8 +35,13 @@ static time_t               last_dns_lookup;
  *
  */
 void HandleDownload(download_t *download, char *buff, int len, int code) {
+    if (!download->onFinish) {
+        gi.dprintf("HandleDownload: NULL onFinish callback\n");
+        return;
+    }
     if (!download->initiator) {
-        gi.dprintf("HandleDownload: NULL initiator");
+        gi.dprintf("HandleDownload: NULL initiator\n");
+        return;
     }
     download->onFinish(download, code, (byte *)buff, len);
 }

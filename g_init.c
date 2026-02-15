@@ -98,6 +98,7 @@ char     cloud_cmd_whois[25]     = "!whois";
 
 qboolean vpn_enable              = qfalse;
 qboolean vpn_kick                = qtrue;
+qboolean vpn_ban                 = qfalse;
 char     vpn_api_key[33]         = "";
 
 int      ip_limit                = 0;
@@ -256,6 +257,54 @@ qboolean filternonprintabletext = qfalse;
 char lockoutmsg[256];
 
 char com_token[MAX_TOKEN_CHARS];
+
+static connect_rate_entry_t connect_history[CONNECT_HISTORY_SIZE];
+static int connect_history_count = 0;
+
+static connect_rate_entry_t *find_connect_rate(netadr_t *addr) {
+    for (int j = 0; j < connect_history_count; j++) {
+        if (NET_IsEqualBaseAdr(addr, &connect_history[j].addr)) {
+            return &connect_history[j];
+        }
+    }
+    return NULL;
+}
+
+static connect_rate_entry_t *add_connect_rate(netadr_t *addr) {
+    connect_rate_entry_t *entry;
+    if (connect_history_count < CONNECT_HISTORY_SIZE) {
+        entry = &connect_history[connect_history_count++];
+    } else {
+        // evict oldest
+        float oldest_time = connect_history[0].last_connect;
+        int oldest = 0;
+        for (int j = 1; j < CONNECT_HISTORY_SIZE; j++) {
+            if (connect_history[j].last_connect < oldest_time) {
+                oldest_time = connect_history[j].last_connect;
+                oldest = j;
+            }
+        }
+        entry = &connect_history[oldest];
+    }
+    q2a_memset(entry, 0, sizeof(*entry));
+    entry->addr = *addr;
+    entry->last_connect = ltime;
+    entry->count = 1;
+    return entry;
+}
+
+/**
+ * Save current flood state to the connect rate entry for the client's IP.
+ * Called before proxyinfo is zeroed so we can preserve state across reconnects.
+ */
+static void save_flood_state(int client) {
+    connect_rate_entry_t *rate = find_connect_rate(&proxyinfo[client].address);
+    if (rate) {
+        rate->chatcount = proxyinfo[client].chatcount;
+        rate->chattimeout = proxyinfo[client].chattimeout;
+        rate->mute_flags = proxyinfo[client].clientcommand & (CCMD_CSILENCE | CCMD_PCSILENCE);
+    }
+}
 
 /**
  * Com_Parse will parse a token out of a string.
@@ -995,7 +1044,12 @@ qboolean ClientConnect(edict_t *ent, char *userinfo) {
 
     client = getEntOffset(ent) - 1;
 
+    // save flood state before zeroing proxyinfo
+    save_flood_state(client);
+
+    uint32_t gen = proxyinfo[client].generation + 1;
     q2a_memset(&proxyinfo[client], 0, sizeof(proxyinfo_t));
+    proxyinfo[client].generation = gen;
     proxyinfo[client].ent = ent;
     proxyinfo[client].enteredgame = ltime;
     proxyinfo[client].userinfo_changed_start = ltime;
@@ -1014,6 +1068,31 @@ qboolean ClientConnect(edict_t *ent, char *userinfo) {
                 proxyinfo[client].clientcommand |= CCMD_BANNED;
                 q2a_strncpy(proxyinfo[client].buffer, currentBanMsg, sizeof(proxyinfo[client].buffer));
             }
+        }
+    }
+
+    // check connect rate and restore flood state from previous connection
+    {
+        connect_rate_entry_t *rate = find_connect_rate(&proxyinfo[client].address);
+        if (rate) {
+            if (ltime - rate->last_connect < CONNECT_RATE_WINDOW) {
+                rate->count++;
+                if (rate->count > CONNECT_RATE_MAX) {
+                    gi.cprintf(NULL, PRINT_HIGH, "Connection rate limit exceeded for %s\n", IP(client));
+                    profile_stop(1, "q2admin->ClientConnect (rate limited)", client, ent);
+                    return qfalse;
+                }
+            } else {
+                rate->count = 1;
+            }
+            rate->last_connect = ltime;
+
+            // restore flood state from previous connection
+            proxyinfo[client].chatcount = rate->chatcount;
+            proxyinfo[client].chattimeout = rate->chattimeout;
+            proxyinfo[client].clientcommand |= rate->mute_flags;
+        } else {
+            add_connect_rate(&proxyinfo[client].address);
         }
     }
 
@@ -1654,6 +1733,10 @@ void ClientDisconnect(edict_t *ent) {
         fclose(proxyinfo[client].stuffFile);
     }
 
+    // save flood state before clearing so it persists across reconnects
+    save_flood_state(client);
+
+    proxyinfo[client].generation++;
     proxyinfo[client].inuse = 0;
     proxyinfo[client].admin = 0;
     proxyinfo[client].retries = 0;

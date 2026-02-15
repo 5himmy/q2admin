@@ -1202,6 +1202,12 @@ q2acmd_t q2aCommands[] = {
         &vpn_kick
     },
     {
+        "vpn_ban",
+        CMDWHERE_CFGFILE | CMDWHERE_CLIENTCONSOLE | CMDWHERE_SERVERCONSOLE,
+        CMDTYPE_LOGICAL,
+        &vpn_ban
+    },
+    {
         "zbc_enable",
         CMDWHERE_CFGFILE | CMDWHERE_CLIENTCONSOLE | CMDWHERE_SERVERCONSOLE,
         CMDTYPE_LOGICAL,

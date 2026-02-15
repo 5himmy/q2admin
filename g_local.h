@@ -196,6 +196,7 @@ typedef struct {
     char client_version[MAX_VERSION_CHARS];   // build string
     chatpest_t pest;                // tracking annoying chat behavior
     freeze_t freeze;                // used to freeze a player in place
+    uint32_t generation;            // incremented on connect/disconnect to detect stale callbacks
 } proxyinfo_t;
 
 typedef struct {
@@ -502,6 +503,19 @@ extern int reconnect_time;
 extern int reconnect_checklevel;
 extern int entity_classname_offset;
 extern int checkvar_poll_time;
+
+#define CONNECT_HISTORY_SIZE 32
+#define CONNECT_RATE_WINDOW  60   // seconds
+#define CONNECT_RATE_MAX     3    // max connects per window
+
+typedef struct {
+    netadr_t addr;
+    float last_connect;
+    int count;
+    int chatcount;
+    float chattimeout;
+    uint32_t mute_flags;
+} connect_rate_entry_t;
 
 typedef struct {
     long reconnecttimeout;

@@ -26,7 +26,19 @@ typedef struct {
     char            asn[10];
 } vpn_t;
 
+#define VPN_CACHE_SIZE 64
+#define VPN_CACHE_TTL  3600  // seconds
+
+typedef struct {
+    netadr_t addr;
+    vpn_state_t result;
+    float expiry;
+    char network[50];
+    char asn[10];
+} vpn_cache_entry_t;
+
 extern qboolean vpn_kick;
+extern qboolean vpn_ban;
 extern qboolean vpn_enable;
 extern char vpn_api_key[33];
 extern char vpn_host[50];
@@ -34,4 +46,7 @@ extern char vpn_host[50];
 void FinishVPNLookup(download_t *download, int code, byte *buff, int len);
 qboolean isVPN(int clientnum);
 void LookupVPNStatus(edict_t *ent);
+vpn_cache_entry_t *vpn_cache_lookup(netadr_t *addr);
+void vpn_cache_store(netadr_t *addr, vpn_state_t result, const char *network, const char *asn);
+void vpn_add_ban(int clientnum);
 void vpnUsersRun(int startarg, edict_t *ent, int client);

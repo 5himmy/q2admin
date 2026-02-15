@@ -34,6 +34,7 @@ typedef struct download_s {
     dltype_t    type;
     char        path[1024];
     void        (*onFinish)(struct download_s *, int, byte *, int);
+    uint32_t    generation;         // snapshot of client generation when request was made
 } download_t;
 
 typedef struct dlhandle_s {
