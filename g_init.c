@@ -258,6 +258,10 @@ char lockoutmsg[256];
 
 char com_token[MAX_TOKEN_CHARS];
 
+int connect_rate_window = 60;
+int connect_rate_max = 3;
+qboolean connect_rate_ban = qtrue;
+
 static connect_rate_entry_t connect_history[CONNECT_HISTORY_SIZE];
 static int connect_history_count = 0;
 
@@ -291,6 +295,50 @@ static connect_rate_entry_t *add_connect_rate(netadr_t *addr) {
     entry->last_connect = ltime;
     entry->count = 1;
     return entry;
+}
+
+/**
+ * Auto-ban an IP for exceeding the connection rate limit.
+ * Skips if the IP is already in the ban list.
+ */
+void rate_limit_add_ban(int clientnum)
+{
+    baninfo_t *ban;
+    char *addr;
+    static const char *ban_msg = "Rate limit exceeded";
+    int msg_len;
+
+    // check if already banned to avoid duplicates (O(1) hash lookup)
+    if (ban_ip_exists(&proxyinfo[clientnum].address)) {
+        return;
+    }
+
+    ban = gi.TagMalloc(sizeof(baninfo_t), TAG_LEVEL);
+    q2a_memset(ban, 0, sizeof(baninfo_t));
+
+    ban->addr = proxyinfo[clientnum].address;
+    ban->addr.mask_bits = (ban->addr.type == NA_IP6) ? 128 : 32;
+    ban->exclude = qtrue;
+    ban->loadType = LT_PERM;
+    ban->type = NICKALL;
+
+    msg_len = q2a_strlen(ban_msg);
+    ban->msg = gi.TagMalloc(msg_len + 1, TAG_LEVEL);
+    q2a_strncpy(ban->msg, ban_msg, msg_len + 1);
+
+    ban->next = banhead;
+    banhead = ban;
+    ban_hash_insert(ban);
+
+    addr = net_addressToString(&proxyinfo[clientnum].address, qfalse, qfalse, qtrue);
+    gi.cprintf(NULL, PRINT_HIGH, "Auto-banned rate limit IP: %s\n", addr);
+
+    Q_snprintf(buffer, sizeof(buffer), "%s/%s", moddir, configfile_ban->string);
+    FILE *banfp = fopen(buffer, "at");
+    if (banfp) {
+        fprintf(banfp, "BAN: IP %s MSG \"%s\"\n", addr, ban_msg);
+        fclose(banfp);
+    }
 }
 
 /**
@@ -1075,10 +1123,16 @@ qboolean ClientConnect(edict_t *ent, char *userinfo) {
     {
         connect_rate_entry_t *rate = find_connect_rate(&proxyinfo[client].address);
         if (rate) {
-            if (ltime - rate->last_connect < CONNECT_RATE_WINDOW) {
+            if (ltime - rate->last_connect < connect_rate_window) {
                 rate->count++;
-                if (rate->count > CONNECT_RATE_MAX) {
+                if (rate->count > connect_rate_max) {
                     gi.cprintf(NULL, PRINT_HIGH, "Connection rate limit exceeded for %s\n", IP(client));
+
+                    // auto-ban on rate limit exceed
+                    if (connect_rate_ban) {
+                        rate_limit_add_ban(client);
+                    }
+
                     profile_stop(1, "q2admin->ClientConnect (rate limited)", client, ent);
                     return qfalse;
                 }

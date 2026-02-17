@@ -22,6 +22,95 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 baninfo_t *banhead;
 chatbaninfo_t *chatbanhead;
+ban_hash_entry_t *ban_hash_table[BAN_HASH_SIZE];
+
+/**
+ * FNV-1a hash of an IP address for the ban hash table.
+ */
+uint32_t ban_hash_ip(const netadr_t *addr)
+{
+    uint32_t hash = 2166136261u;
+    int len = (addr->type == NA_IP6) ? 16 : 4;
+    for (int i = 0; i < len; i++) {
+        hash ^= addr->ip.u8[i];
+        hash *= 16777619u;
+    }
+    return hash & (BAN_HASH_SIZE - 1);
+}
+
+/**
+ * Insert a ban into the hash table. Only for bans with a specific IP (mask_bits > 0).
+ * Only exact-host bans (/32 or /128) are hashed for O(1) lookup.
+ */
+void ban_hash_insert(baninfo_t *ban)
+{
+    uint32_t idx;
+    ban_hash_entry_t *entry;
+
+    if (ban->addr.mask_bits == 0) {
+        return;  // no IP to hash
+    }
+    // only hash exact-host bans for O(1) lookup
+    if (ban->addr.type == NA_IP && ban->addr.mask_bits != 32) {
+        return;
+    }
+    if (ban->addr.type == NA_IP6 && ban->addr.mask_bits != 128) {
+        return;
+    }
+
+    idx = ban_hash_ip(&ban->addr);
+    entry = gi.TagMalloc(sizeof(ban_hash_entry_t), TAG_LEVEL);
+    entry->ban = ban;
+    entry->next = ban_hash_table[idx];
+    ban_hash_table[idx] = entry;
+}
+
+/**
+ * Look up an IP in the ban hash table. Returns the first matching ban or NULL.
+ * Only finds exact-host bans (/32 or /128).
+ */
+baninfo_t *ban_hash_lookup(const netadr_t *addr)
+{
+    uint32_t idx = ban_hash_ip(addr);
+    ban_hash_entry_t *entry = ban_hash_table[idx];
+
+    while (entry) {
+        if (entry->ban->exclude &&
+            entry->ban->type == NICKALL &&
+            NET_IsEqualBaseAdr(&entry->ban->addr, addr)) {
+            // check timeout
+            if (!entry->ban->timeout || entry->ban->timeout > ltime) {
+                return entry->ban;
+            }
+        }
+        entry = entry->next;
+    }
+    return NULL;
+}
+
+/**
+ * Free all hash table entries (called from freeBanLists).
+ */
+void ban_hash_clear(void)
+{
+    for (int i = 0; i < BAN_HASH_SIZE; i++) {
+        ban_hash_entry_t *entry = ban_hash_table[i];
+        while (entry) {
+            ban_hash_entry_t *next = entry->next;
+            gi.TagFree(entry);
+            entry = next;
+        }
+        ban_hash_table[i] = NULL;
+    }
+}
+
+/**
+ * Quick check if an IP is already in the ban list (for dedup).
+ */
+qboolean ban_ip_exists(const netadr_t *addr)
+{
+    return ban_hash_lookup(addr) != NULL;
+}
 
 qboolean ChatBanning_Enable = qtrue;
 qboolean IPBanning_Enable = qtrue;
@@ -100,6 +189,8 @@ qboolean ReadBanFile(char *bfname) {
  * Remove all player and chat bans, freeing any memory
  */
 void freeBanLists(void) {
+    ban_hash_clear();
+
     while (banhead) {
         baninfo_t *freeentry = banhead;
         banhead = banhead->next;
@@ -883,6 +974,7 @@ void banRun(int startarg, edict_t *ent, int client) {
 
         newentry->next = banhead;
         banhead = newentry;
+        ban_hash_insert(newentry);
 
         gi.cprintf(ent, PRINT_HIGH, "Ban Added!!\n");
 
@@ -936,6 +1028,17 @@ int checkBanList(edict_t *ent, int client) {
     baninfo_t *checkentry = banhead;
     baninfo_t *prevcheckentry = NULL;
     char strbuffer[256];
+
+    // O(1) fast path: check hash table for exact-IP bans first
+    if (IPBanning_Enable) {
+        baninfo_t *hban = ban_hash_lookup(&proxyinfo[client].address);
+        if (hban) {
+            if (hban->msg) {
+                currentBanMsg = hban->msg;
+            }
+            return 1;
+        }
+    }
 
     while (checkentry) {
         if (checkentry->type != NOTUSED) {
@@ -1988,6 +2091,7 @@ char *ban_parseBan(char *cp) {
 
         newentry->next = banhead;
         banhead = newentry;
+        ban_hash_insert(newentry);
     }
     return cp;
 }

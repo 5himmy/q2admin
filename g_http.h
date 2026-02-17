@@ -27,12 +27,14 @@ typedef struct {
 typedef enum {
     DL_NONE,
     DL_VPNAPI,
+    DL_VPNFALLBACK,
 } dltype_t;
 
 typedef struct download_s {
     edict_t     *initiator;
     dltype_t    type;
     char        path[1024];
+    char        host[64];           // override host for this download (empty = use vpn_host)
     void        (*onFinish)(struct download_s *, int, byte *, int);
     uint32_t    generation;         // snapshot of client generation when request was made
 } download_t;

@@ -193,10 +193,19 @@ void HTTP_StartDownload(dlhandle_t *dl) {
         dl->curl = curl_easy_init();
     }
 
-    // format: https://vpnapi.io/api/<ipaddress>?key=<apikey>
-    snprintf(dl->URL, sizeof(dl->URL), "https://%s%s", vpn_host, dl->filePath);
+    // use per-download host override if set, otherwise fall back to vpn_host
+    {
+        const char *host = (dl->handle && dl->handle->host[0]) ? dl->handle->host : vpn_host;
+        snprintf(dl->URL, sizeof(dl->URL), "https://%s%s", host, dl->filePath);
+    }
 
-    curl_easy_setopt(dl->curl, CURLOPT_HTTPHEADER, http_header_slist);
+    // only set the cached Host header for primary API downloads;
+    // for fallback/other hosts, let curl derive Host from the URL
+    if (dl->handle && dl->handle->host[0]) {
+        curl_easy_setopt(dl->curl, CURLOPT_HTTPHEADER, NULL);
+    } else {
+        curl_easy_setopt(dl->curl, CURLOPT_HTTPHEADER, http_header_slist);
+    }
     curl_easy_setopt(dl->curl, CURLOPT_ENCODING, "");
 
     if (http_debug) {

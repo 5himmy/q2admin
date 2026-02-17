@@ -504,9 +504,11 @@ extern int reconnect_checklevel;
 extern int entity_classname_offset;
 extern int checkvar_poll_time;
 
-#define CONNECT_HISTORY_SIZE 32
-#define CONNECT_RATE_WINDOW  60   // seconds
-#define CONNECT_RATE_MAX     3    // max connects per window
+#define CONNECT_HISTORY_SIZE 256
+
+extern int connect_rate_window;
+extern int connect_rate_max;
+extern qboolean connect_rate_ban;
 
 typedef struct {
     netadr_t addr;

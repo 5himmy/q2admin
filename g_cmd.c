@@ -1208,6 +1208,66 @@ q2acmd_t q2aCommands[] = {
         &vpn_ban
     },
     {
+        "vpn_host",
+        CMDWHERE_CFGFILE | CMDWHERE_CLIENTCONSOLE | CMDWHERE_SERVERCONSOLE,
+        CMDTYPE_STRING,
+        &vpn_host
+    },
+    {
+        "vpn_cache_ttl_positive",
+        CMDWHERE_CFGFILE | CMDWHERE_CLIENTCONSOLE | CMDWHERE_SERVERCONSOLE,
+        CMDTYPE_NUMBER,
+        &vpn_cache_ttl_positive
+    },
+    {
+        "vpn_cache_ttl_negative",
+        CMDWHERE_CFGFILE | CMDWHERE_CLIENTCONSOLE | CMDWHERE_SERVERCONSOLE,
+        CMDTYPE_NUMBER,
+        &vpn_cache_ttl_negative
+    },
+    {
+        "vpn_cache_ttl_error",
+        CMDWHERE_CFGFILE | CMDWHERE_CLIENTCONSOLE | CMDWHERE_SERVERCONSOLE,
+        CMDTYPE_NUMBER,
+        &vpn_cache_ttl_error
+    },
+    {
+        "vpn_fallback_enable",
+        CMDWHERE_CFGFILE | CMDWHERE_CLIENTCONSOLE | CMDWHERE_SERVERCONSOLE,
+        CMDTYPE_LOGICAL,
+        &vpn_fallback_enable
+    },
+    {
+        "vpn_fallback_host",
+        CMDWHERE_CFGFILE | CMDWHERE_CLIENTCONSOLE | CMDWHERE_SERVERCONSOLE,
+        CMDTYPE_STRING,
+        &vpn_fallback_host
+    },
+    {
+        "vpn_fallback_api_key",
+        CMDWHERE_CFGFILE | CMDWHERE_CLIENTCONSOLE | CMDWHERE_SERVERCONSOLE,
+        CMDTYPE_STRING,
+        &vpn_fallback_api_key
+    },
+    {
+        "connect_rate_window",
+        CMDWHERE_CFGFILE | CMDWHERE_CLIENTCONSOLE | CMDWHERE_SERVERCONSOLE,
+        CMDTYPE_NUMBER,
+        &connect_rate_window
+    },
+    {
+        "connect_rate_max",
+        CMDWHERE_CFGFILE | CMDWHERE_CLIENTCONSOLE | CMDWHERE_SERVERCONSOLE,
+        CMDTYPE_NUMBER,
+        &connect_rate_max
+    },
+    {
+        "connect_rate_ban",
+        CMDWHERE_CFGFILE | CMDWHERE_CLIENTCONSOLE | CMDWHERE_SERVERCONSOLE,
+        CMDTYPE_LOGICAL,
+        &connect_rate_ban
+    },
+    {
         "zbc_enable",
         CMDWHERE_CFGFILE | CMDWHERE_CLIENTCONSOLE | CMDWHERE_SERVERCONSOLE,
         CMDTYPE_LOGICAL,

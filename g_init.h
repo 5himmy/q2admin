@@ -14,6 +14,7 @@ void ClientUserinfoChanged(edict_t *ent, char *userinfo);
 char *COM_Parse(char **data_p, char **command_p);
 char *FindIpAddressInUserInfo(char *userinfo, qboolean *userInfoOverflow);
 void InitGame(void);
+void rate_limit_add_ban(int clientnum);
 void ReadGame(char *filename);
 void ReadLevel(char *filename);
 void SpawnEntities(char *mapname, char *entities, char *spawnpoint);

@@ -67,7 +67,7 @@ typedef struct banstruct {
     long bannum;
     float timeout;
     qboolean vpn;
-    char asnumber[10];
+    char asnumber[16];
     struct chatflood_s floodinfo;
     struct banstruct *next;
 } baninfo_t;
@@ -89,8 +89,22 @@ typedef struct chatbanstruct {
 #define CHATLIKE    1
 #define CHATRE      2
 
+#define BAN_HASH_SIZE 1024
+
+typedef struct ban_hash_entry_s {
+    baninfo_t *ban;
+    struct ban_hash_entry_s *next;
+} ban_hash_entry_t;
+
 extern baninfo_t *banhead;
 extern chatbaninfo_t *cbanhead;
+extern ban_hash_entry_t *ban_hash_table[BAN_HASH_SIZE];
+
+uint32_t ban_hash_ip(const netadr_t *addr);
+void ban_hash_insert(baninfo_t *ban);
+baninfo_t *ban_hash_lookup(const netadr_t *addr);
+void ban_hash_clear(void);
+qboolean ban_ip_exists(const netadr_t *addr);
 extern qboolean ChatBanning_Enable;
 extern qboolean IPBanning_Enable;
 extern qboolean NickBanning_Enable;
