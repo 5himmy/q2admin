@@ -1325,7 +1325,7 @@ void displayNextBan(edict_t *ent, int client, long bannum) {
                 Q_snprintf(
                         buffer + q2a_strlen(buffer),
                         sizeof(buffer) - q2a_strlen(buffer),
-                        " VPN %s", findentry->asnumber
+                        " VPN \"%s\"", findentry->asnumber
                 );
             }
         }
@@ -1936,15 +1936,36 @@ char *ban_parseBan(char *cp) {
         if (startContains(cp, "VPN")) {
             cp += 3;
             SKIPBLANK(cp);
+
+            // skip optional opening quote
+            qboolean quoted = qfalse;
+            if (*cp == '"') {
+                cp++;
+                quoted = qtrue;
+            }
+
             if (startContains(cp, "AS")) {
+                // skip doubled AS prefix (ASAS12345 -> AS12345)
+                if (startContains(cp + 2, "AS")) {
+                    cp += 2;
+                }
                 tempcp = cp;
                 // find the end of the ASN string
-                while (!isspace(*tempcp)) {
-                    tempcp++;
+                if (quoted) {
+                    while (*tempcp && *tempcp != '"') {
+                        tempcp++;
+                    }
+                } else {
+                    while (*tempcp && !isspace(*tempcp)) {
+                        tempcp++;
+                    }
                 }
                 q2a_memset(newentry->asnumber, 0, sizeof(newentry->asnumber));
                 q2a_memcpy(newentry->asnumber, cp, (tempcp-cp));
                 cp = tempcp;
+                if (quoted && *cp == '"') {
+                    cp++;
+                }
                 SKIPBLANK(cp);
             } else {
                 gi.cprintf(NULL, PRINT_HIGH, "Ban parsing error near VPN: not an ASN\n");

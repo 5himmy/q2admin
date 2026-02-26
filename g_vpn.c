@@ -105,8 +105,6 @@ void vpn_add_ban(int clientnum)
 {
     baninfo_t *ban;
     char *addr;
-    static const char *ban_msg = "VPN connections not allowed, please reconnect without it";
-    int msg_len;
 
     // check if already banned to avoid duplicates (O(1) hash lookup)
     if (ban_ip_exists(&proxyinfo[clientnum].address)) {
@@ -122,9 +120,7 @@ void vpn_add_ban(int clientnum)
     ban->loadType = LT_PERM;
     ban->type = NICKALL;
 
-    msg_len = q2a_strlen(ban_msg);
-    ban->msg = gi.TagMalloc(msg_len + 1, TAG_LEVEL);
-    q2a_strncpy(ban->msg, ban_msg, msg_len + 1);
+    q2a_strncpy(ban->asnumber, proxyinfo[clientnum].vpn.asn, sizeof(ban->asnumber) - 1);
 
     // prepend to ban list and hash table
     ban->next = banhead;
@@ -132,13 +128,13 @@ void vpn_add_ban(int clientnum)
     ban_hash_insert(ban);
 
     addr = net_addressToString(&proxyinfo[clientnum].address, qfalse, qfalse, qtrue);
-    gi.cprintf(NULL, PRINT_HIGH, "Auto-banned VPN IP: %s (AS%s)\n", addr, proxyinfo[clientnum].vpn.asn);
+    gi.cprintf(NULL, PRINT_HIGH, "Auto-banned VPN IP: %s (%s)\n", addr, proxyinfo[clientnum].vpn.asn);
 
     // persist to ban file
     Q_snprintf(buffer, sizeof(buffer), "%s/%s", moddir, configfile_ban->string);
     FILE *banfp = fopen(buffer, "at");
     if (banfp) {
-        fprintf(banfp, "BAN: IP %s MSG \"%s\"\n", addr, ban_msg);
+        fprintf(banfp, "BAN: IP %s VPN \"%s\"\n", addr, proxyinfo[clientnum].vpn.asn);
         fclose(banfp);
     }
 }
