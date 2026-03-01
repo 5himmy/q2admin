@@ -155,10 +155,19 @@ void ClientThink(edict_t *ent, usercmd_t *ucmd) {
                 if (msec.max_violations) {
                     cl->msec.violations++;
                     if (cl->msec.violations >= msec.max_violations) {
-                        if (msec.action != MVA_NOTHING) {
+                        switch (msec.action) {
+                        case MVA_WARN:
+                            gi.cprintf(ent, PRINT_HIGH, "[Q2Admin] Warning: excessive msec detected (%d/%d)\n", cl->msec.total, msec.max_allowed);
+                            cl->msec.violations = 0;
+                            break;
+                        case MVA_KICK:
+                        case MVA_LEGACY:
                             gi.bprintf(PRINT_HIGH, "Excessive msec consumption from %s\n", cl->name);
                             Q_snprintf(buffer, sizeof(buffer), "exceeded msec limit %d/%d in %d secs", cl->msec.total, msec.max_allowed, msec.timespan);
                             addCmdQueue(client, QCMD_DISCONNECT, 1, 0, buffer);
+                            break;
+                        default:
+                            break;
                         }
                     }
                 } else {
@@ -171,10 +180,19 @@ void ClientThink(edict_t *ent, usercmd_t *ucmd) {
             if (cl->msec.total < msec.min_required) {
                 cl->msec.violations++;
                 if (cl->msec.violations >= msec.max_violations) {
-                    if (msec.action != MVA_NOTHING) {
+                    switch (msec.action) {
+                    case MVA_WARN:
+                        gi.cprintf(ent, PRINT_HIGH, "[Q2Admin] Warning: msec underflow detected (%d/%d)\n", cl->msec.total, msec.min_required);
+                        cl->msec.violations = 0;
+                        break;
+                    case MVA_KICK:
+                    case MVA_LEGACY:
                         gi.bprintf(PRINT_HIGH, "msec underflow from %s\n", cl->name);
                         Q_snprintf(buffer, sizeof(buffer), "something is fishy, didn't meet msec requirement - %d/%d in %d secs", cl->msec.total, msec.min_required, msec.timespan);
                         addCmdQueue(client, QCMD_DISCONNECT, 1, 0, buffer);
+                        break;
+                    default:
+                        break;
                     }
                 }
             }

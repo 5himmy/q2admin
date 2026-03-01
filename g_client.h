@@ -53,6 +53,7 @@ typedef enum {
     MVA_LEGACY,             // backwards compat, kick if over max_violations
     MVA_NOTHING,            // Don't do anything
     MVA_KICK,               // Remove the offender
+    MVA_WARN,               // Warn the player privately, reset violations
 } msec_action_t;
 
 // Limits and such for ensuring msec values sent from clients are not abused.
